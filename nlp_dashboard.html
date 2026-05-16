@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NLP Pipeline Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0f1117;color:#e0e0e0;overflow-x:hidden}
+h1{text-align:center;padding:22px 0 4px;font-size:1.7rem;letter-spacing:1px;color:#fff}
+.subtitle{text-align:center;color:#888;font-size:.9rem;margin-bottom:18px}
+.stats-row{display:flex;gap:12px;padding:0 20px 16px;flex-wrap:wrap;justify-content:center}
+.stat-card{background:#1a1d2e;border:1px solid #2a2d3e;border-radius:12px;padding:14px 22px;text-align:center;min-width:130px}
+.stat-num{font-size:1.6rem;font-weight:700;color:#7c8dff}
+.stat-lbl{font-size:.75rem;color:#888;margin-top:2px}
+.section{padding:14px 20px 6px;font-size:.8rem;color:#666;letter-spacing:2px;text-transform:uppercase}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 20px 20px}
+.panel{background:#1a1d2e;border:1px solid #2a2d3e;border-radius:14px;padding:16px}
+.panel h3{font-size:.95rem;color:#aaa;margin-bottom:10px}
+canvas#world{width:100%;height:480px;display:block;border-radius:14px;cursor:grab;background:#080c18}
+.world-wrap{padding:0 20px 20px;position:relative}
+.world-label{position:absolute;top:24px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.7);color:#fff;padding:6px 18px;border-radius:20px;font-size:.8rem;pointer-events:none}
+.legend{display:flex;gap:16px;justify-content:center;padding:0 0 8px;font-size:.78rem}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
+.grave-list{max-height:200px;overflow-y:auto;font-size:.78rem;line-height:1.8}
+.grave-item{display:flex;justify-content:space-between;padding:2px 6px;border-radius:4px}
+.grave-item:nth-child(odd){background:#131629}
+.tag{font-size:.68rem;padding:2px 7px;border-radius:8px;background:#2a1a1a;color:#e07070}
+.throne-item{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:.8rem}
+.bar-fill{height:8px;border-radius:4px;background:linear-gradient(90deg,#f0a500,#ffe066)}
+.plotly-graph{background:#1a1d2e;border-radius:14px;border:1px solid #2a2d3e}
+footer{text-align:center;padding:20px;color:#444;font-size:.75rem}
+</style>
+</head>
+<body>
+<h1>🧠 NLP Pipeline Dashboard</h1>
+<p class="subtitle">Complete analysis · Graveyard &amp; Throne Room · Interactive 3D</p>
+
+<div class="stats-row" id="statsRow"></div>
+
+<div class="section">3D World — Graveyard &amp; Throne Room</div>
+<div class="world-wrap">
+  <canvas id="world"></canvas>
+  <div class="world-label">🪦 Graveyard (left) — removed tokens &nbsp;|&nbsp; 👑 Throne Room (right) — TF-IDF survivors &nbsp;·&nbsp; Drag to rotate</div>
+</div>
+<div class="legend">
+  <span><span class="dot" style="background:#e05555"></span>Removed by number regex</span>
+  <span><span class="dot" style="background:#e0a030"></span>Removed by punctuation regex</span>
+  <span><span class="dot" style="background:#7070e0"></span>Stop word removed</span>
+  <span><span class="dot" style="background:#f0d060"></span>TF-IDF survivor (throne)</span>
+</div>
+
+<div class="two-col">
+  <div class="panel">
+    <h3>🪦 Graveyard — all removed tokens</h3>
+    <div class="grave-list" id="graveList"></div>
+  </div>
+  <div class="panel">
+    <h3>👑 Throne Room — top TF-IDF words</h3>
+    <div id="throneList"></div>
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="panel plotly-graph" id="funnelDiv"></div>
+  <div class="panel plotly-graph" id="bigramDiv"></div>
+</div>
+
+<div style="padding:0 20px 20px">
+  <div class="panel plotly-graph" id="tfidfDiv"></div>
+</div>
+
+<footer>NLP Assignment Dashboard · Built with Python + Plotly + Three.js</footer>
+
+<script>
+const DEAD   = [["3", "number (regex \\d+)"], ["30", "number (regex \\d+)"], ["05", "number (regex \\d+)"], ["2026", "number (regex \\d+)"], ["1", "number (regex \\d+)"], ["2", "number (regex \\d+)"], ["4", "number (regex \\d+)"], ["3", "number (regex \\d+)"], ["100", "number (regex \\d+)"], ["05", "number (regex \\d+)"], ["4", "number (regex \\d+)"], ["5", "number (regex \\d+)"], ["6", "number (regex \\d+)"], ["12", "number (regex \\d+)"], ["30", "number (regex \\d+)"], ["1", "number (regex \\d+)"], ["1", "number (regex \\d+)"], ["1", "number (regex \\d+)"], ["2", "number (regex \\d+)"], ["3", "number (regex \\d+)"], ["4", "number (regex \\d+)"], ["5", "number (regex \\d+)"], ["6", "number (regex \\d+)"], ["4", "number (regex \\d+)"], ["5", "number (regex \\d+)"], ["1", "number (regex \\d+)"], ["4", "number (regex \\d+)"], ["1", "number (regex \\d+)"], ["3", "number (regex \\d+)"], ["1", "number (regex \\d+)"], ["3", "number (regex \\d+)"], ["1", "number (regex \\d+)"], ["4", "number (regex \\d+)"], ["1", "number (regex \\d+)"], ["4", "number (regex \\d+)"], ["1200", "number (regex \\d+)"], ["960", "number (regex \\d+)"], ["750", "number (regex \\d+)"], ["600", "number (regex \\d+)"], ["1000", "number (regex \\d+)"], [":", "punctuation (regex)"], ["(", "punctuation (regex)"], [")", "punctuation (regex)"], [":", "punctuation (regex)"], ["-", "punctuation (regex)"], [".", "punctuation (regex)"], [".", "punctuation (regex)"], ["&", "punctuation (regex)"], ["\u2019", "punctuation (regex)"], [".", "punctuation (regex)"], ["\u2019", "punctuation (regex)"], [".", "punctuation (regex)"], [":", "punctuation (regex)"], [".", "punctuation (regex)"], ["(", "punctuation (regex)"], [")", "punctuation (regex)"], ["/", "punctuation (regex)"], [".", "punctuation (regex)"], [".", "punctuation (regex)"], [".", "punctuation (regex)"], [".", "punctuation (regex)"], ["-", "punctuation (regex)"], [".", "punctuation (regex)"], [".", "punctuation (regex)"], [".", "punctuation (regex)"], [".", "punctuation (regex)"], ["(", "punctuation (regex)"], [")", "punctuation (regex)"], [".", "punctuation (regex)"], [".", "punctuation (regex)"], ["of", "stop word"], ["to", "stop word"], ["not", "stop word"], ["s", "stop word"], ["s", "stop word"], ["this", "stop word"], ["be", "stop word"], ["in", "stop word"], ["below", "stop word"], ["and", "stop word"]];
+const ALIVE  = [{"word": "speed", "tfidf_score": 0.18555}, {"word": "points", "tfidf_score": 0.13027}, {"word": "correct", "tfidf_score": 0.12429}, {"word": "design", "tfidf_score": 0.12295}, {"word": "drive", "tfidf_score": 0.11912}, {"word": "motor", "tfidf_score": 0.11439}, {"word": "control", "tfidf_score": 0.10877}, {"word": "fan", "tfidf_score": 0.10103}, {"word": "standards", "tfidf_score": 0.09344}, {"word": "simulation", "tfidf_score": 0.09277}, {"word": "assessment", "tfidf_score": 0.0925}, {"word": "tower", "tfidf_score": 0.08849}, {"word": "circuit", "tfidf_score": 0.08669}, {"word": "project", "tfidf_score": 0.08518}, {"word": "protection", "tfidf_score": 0.08294}, {"word": "rated", "tfidf_score": 0.07805}, {"word": "must", "tfidf_score": 0.07613}, {"word": "system", "tfidf_score": 0.07344}, {"word": "torque", "tfidf_score": 0.07336}, {"word": "cooling", "tfidf_score": 0.07113}, {"word": "selection", "tfidf_score": 0.06519}, {"word": "partially", "tfidf_score": 0.06495}, {"word": "results", "tfidf_score": 0.06301}, {"word": "lfi", "tfidf_score": 0.06183}, {"word": "electrical", "tfidf_score": 0.05956}];
+const STAGES = [{"name": "1. Raw", "count": 2540}, {"name": "2. After remove numbers", "count": 2484}, {"name": "3. After remove symbols", "count": 2328}, {"name": "4. After clean spaces", "count": 2328}, {"name": "5. After remove punctuation", "count": 2328}, {"name": "6. Tokenized", "count": 2328}, {"name": "7. After stopword removal", "count": 1631}, {"name": "8. After stemming", "count": 1631}, {"name": "9. After lemmatization", "count": 1631}];
+const STATS  = {"pages": 12, "raw_words": 2540, "unique_words": 682, "valid_words": 1631, "stop_removed": 635, "language": "en", "readability": "N/A", "vocab_rich": 41.81};
+const BIGRAMS= [{"bigram": "correct partially", "count": 9}, {"bigram": "electric drive", "count": 6}, {"bigram": "drive system", "count": 6}, {"bigram": "tower tower", "count": 5}, {"bigram": "lfi lfi", "count": 5}, {"bigram": "partially correct", "count": 5}, {"bigram": "design specifications", "count": 5}, {"bigram": "points points", "count": 5}, {"bigram": "project design", "count": 4}, {"bigram": "three phase", "count": 4}];
+
+// ── Stats cards ───────────────────────────────────────────
+const statDefs = [
+  ["Pages",          STATS.pages,         "#7c8dff"],
+  ["Raw words",      STATS.raw_words.toLocaleString(), "#5ecbaa"],
+  ["Unique words",   STATS.unique_words.toLocaleString(), "#f0a040"],
+  ["Valid tokens",   STATS.valid_words.toLocaleString(), "#60c060"],
+  ["Stop removed",   STATS.stop_removed.toLocaleString(), "#e07070"],
+  ["Language",       STATS.language.toUpperCase(), "#c080ff"],
+  ["Vocab richness", STATS.vocab_rich+"%", "#5ec8ff"],
+];
+const sr = document.getElementById("statsRow");
+statDefs.forEach(([l,v,c])=>{
+  sr.innerHTML += `<div class="stat-card"><div class="stat-num" style="color:${c}">${v}</div><div class="stat-lbl">${l}</div></div>`;
+});
+
+// ── Grave & Throne lists ──────────────────────────────────
+const gl = document.getElementById("graveList");
+DEAD.forEach(([w,r])=>{
+  gl.innerHTML += `<div class="grave-item"><span>${w}</span><span class="tag">${r}</span></div>`;
+});
+
+const tl = document.getElementById("throneList");
+const maxScore = Math.max(...ALIVE.map(a=>a.tfidf_score));
+ALIVE.forEach((a,i)=>{
+  const pct = Math.round(a.tfidf_score/maxScore*100);
+  const crown = i===0?"👑":i===1?"🥈":i===2?"🥉":"";
+  tl.innerHTML += `<div class="throne-item">
+    <span style="min-width:16px;text-align:center">${crown||"·"}</span>
+    <span style="min-width:100px;color:#ddd">${a.word}</span>
+    <div style="flex:1"><div class="bar-fill" style="width:${pct}%"></div></div>
+    <span style="min-width:52px;text-align:right;color:#aaa;font-size:.72rem">${a.tfidf_score.toFixed(4)}</span>
+  </div>`;
+});
+
+// ── Plotly funnel ─────────────────────────────────────────
+Plotly.newPlot("funnelDiv", [{
+  type:"funnel", y:STAGES.map(s=>s.name), x:STAGES.map(s=>s.count),
+  textinfo:"value+percent initial",
+  marker:{color:["#378ADD","#1D9E75","#EF9F27","#D85A30","#534AB7","#993556","#0F6E56","#BA7517","#639922"]}
+}],{
+  title:{text:"Preprocessing Funnel",font:{color:"#ccc"}},
+  paper_bgcolor:"transparent", plot_bgcolor:"transparent",
+  font:{color:"#aaa"}, margin:{t:50,b:20,l:10,r:10}, height:280
+}, {displayModeBar:false});
+
+// ── Plotly bigram bar ─────────────────────────────────────
+Plotly.newPlot("bigramDiv", [{
+  type:"bar", orientation:"h",
+  y:BIGRAMS.map(b=>b.bigram), x:BIGRAMS.map(b=>b.count),
+  marker:{color:"#534AB7"},
+  text:BIGRAMS.map(b=>b.count), textposition:"outside"
+}],{
+  title:{text:"Top Bigrams",font:{color:"#ccc"}},
+  paper_bgcolor:"transparent", plot_bgcolor:"transparent",
+  font:{color:"#aaa"}, margin:{t:50,b:20,l:130,r:30},
+  height:280, yaxis:{autorange:"reversed"}
+},{displayModeBar:false});
+
+// ── Plotly TF-IDF scatter ─────────────────────────────────
+Plotly.newPlot("tfidfDiv", [{
+  type:"scatter", mode:"markers+text",
+  x:ALIVE.map(a=>a.word), y:ALIVE.map(a=>a.tfidf_score),
+  text:ALIVE.map(a=>a.tfidf_score.toFixed(4)), textposition:"top center",
+  marker:{
+    size:ALIVE.map(a=>a.tfidf_score*600+10),
+    color:ALIVE.map(a=>a.tfidf_score),
+    colorscale:"Viridis", showscale:true,
+    colorbar:{title:"TF-IDF",tickfont:{color:"#aaa"},titlefont:{color:"#aaa"}}
+  },
+  hovertemplate:"<b>%{x}</b><br>TF-IDF: %{y:.5f}<extra></extra>"
+}],{
+  title:{text:"TF-IDF Scatter — Required Graph",font:{color:"#ccc",size:15}},
+  paper_bgcolor:"transparent", plot_bgcolor:"transparent",
+  font:{color:"#aaa"},
+  xaxis:{title:"Words",tickangle:-40,color:"#888"},
+  yaxis:{title:"TF-IDF Score",color:"#888"},
+  margin:{t:55,b:100,l:70,r:20}, height:380
+},{displayModeBar:false});
+
+// ── THREE.JS Graveyard & Throne Room ─────────────────────
+const canvas3 = document.getElementById("world");
+const renderer = new THREE.WebGLRenderer({canvas:canvas3,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setClearColor(0x080c18);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45,2,0.1,500);
+camera.position.set(0,12,32);
+camera.lookAt(0,0,0);
+
+const resize3 = ()=>{
+  renderer.setSize(canvas3.clientWidth,canvas3.clientHeight,false);
+  camera.aspect=canvas3.clientWidth/canvas3.clientHeight;
+  camera.updateProjectionMatrix();
+};
+resize3();
+new ResizeObserver(resize3).observe(canvas3);
+
+scene.add(new THREE.AmbientLight(0xffffff,0.5));
+const dl=new THREE.DirectionalLight(0xffffff,0.9);
+dl.position.set(10,20,15); scene.add(dl);
+const dl2=new THREE.DirectionalLight(0x8899ff,0.3);
+dl2.position.set(-15,5,-10); scene.add(dl2);
+
+// Ground planes
+const mkPlane=(color,x)=>{
+  const m=new THREE.Mesh(
+    new THREE.PlaneGeometry(24,20),
+    new THREE.MeshStandardMaterial({color,roughness:1,transparent:true,opacity:0.18})
+  );
+  m.rotation.x=-Math.PI/2; m.position.set(x,-0.01,0); scene.add(m);
+};
+mkPlane(0x2a1010,-14); mkPlane(0x101a2a,14);
+
+// Grid
+const grid=new THREE.GridHelper(60,40,0x222233,0x1a1a2a);
+grid.position.y=0; scene.add(grid);
+
+// Divider wall
+const wall=new THREE.Mesh(
+  new THREE.BoxGeometry(0.15,8,20),
+  new THREE.MeshStandardMaterial({color:0x334455,roughness:0.8})
+);
+wall.position.set(0,3.5,0); scene.add(wall);
+
+// Make sprite label
+function makeSprite(word, color){
+  const lc=document.createElement("canvas");
+  lc.width=256; lc.height=64;
+  const ctx=lc.getContext("2d");
+  ctx.clearRect(0,0,256,64);
+  ctx.fillStyle="#"+color.toString(16).padStart(6,"0");
+  ctx.font="bold 22px monospace";
+  ctx.textAlign="center";
+  ctx.fillText(word.length>12?word.slice(0,11)+"…":word,128,44);
+  const tex=new THREE.CanvasTexture(lc);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));
+  s.scale.set(2.6,0.65,1);
+  return s;
+}
+
+// Tombstone shape
+function makeTombstone(word, cause, idx){
+  const col = cause.includes("number")?0xe05555:cause.includes("punct")?0xe0a030:0x7070e0;
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(
+    new THREE.BoxGeometry(1.2,1.8,0.25),
+    new THREE.MeshStandardMaterial({color:0x334455,roughness:0.8,metalness:0.1})
+  );
+  body.position.y=0.9; g.add(body);
+  const top=new THREE.Mesh(
+    new THREE.CylinderGeometry(0.6,0.6,0.25,12,1,false,0,Math.PI),
+    new THREE.MeshStandardMaterial({color:0x2a3a4a,roughness:0.9})
+  );
+  top.rotation.z=Math.PI/2; top.position.set(0,1.92,0); g.add(top);
+  const sp=makeSprite(word,col);
+  sp.position.set(0,2.8,0); g.add(sp);
+  const cols=8;
+  const r=idx%cols, c=Math.floor(idx/cols);
+  g.position.set(-14+r*2.2-8, 0, c*2.5-6);
+  return g;
+}
+
+// Pedestal / throne
+function makePedestal(word, score, rank, idx){
+  const h=Math.max(0.4, score*18);
+  const col=rank===0?0xffd700:rank===1?0xc0c0c0:rank===2?0xcd7f32:0x534AB7;
+  const g=new THREE.Group();
+  const ped=new THREE.Mesh(
+    new THREE.BoxGeometry(1.5,h,1.5),
+    new THREE.MeshStandardMaterial({color:col,roughness:0.3,metalness:0.4,
+      emissive:new THREE.Color(col),emissiveIntensity:0.15})
+  );
+  ped.position.y=h/2; g.add(ped);
+  if(rank<3){
+    const crown=new THREE.Mesh(
+      new THREE.ConeGeometry(0.35,0.6,6),
+      new THREE.MeshStandardMaterial({color:0xffe066,metalness:0.8,roughness:0.2})
+    );
+    crown.position.y=h+0.5; g.add(crown);
+  }
+  const sp=makeSprite(word,rank<3?0xffe066:0xaaaaff);
+  sp.position.set(0,h+1.1,0); g.add(sp);
+  const cols=5;
+  const r=idx%cols, c=Math.floor(idx/cols);
+  g.position.set(14+r*3.2-8, 0, c*3.5-5);
+  return g;
+}
+
+// Populate graveyard
+DEAD.slice(0,50).forEach((d,i)=>scene.add(makeTombstone(d[0],d[1],i)));
+
+// Populate throne room
+const maxS=Math.max(...ALIVE.map(a=>a.tfidf_score));
+ALIVE.forEach((a,i)=>scene.add(makePedestal(a.word,a.tfidf_score/maxS,i,i)));
+
+// Floating particles (left = red, right = blue)
+const pGeo=new THREE.SphereGeometry(0.06,6,6);
+const particles=[];
+for(let i=0;i<40;i++){
+  const side=Math.random()<0.5?-1:1;
+  const mat=new THREE.MeshStandardMaterial({
+    color:side<0?0xe05555:0x7c8dff,
+    emissive:side<0?0xe05555:0x7c8dff,
+    emissiveIntensity:0.6
+  });
+  const p=new THREE.Mesh(pGeo,mat);
+  p.position.set(side*(3+Math.random()*12),Math.random()*6,Math.random()*14-7);
+  p.userData={vy:0.005+Math.random()*0.01,side};
+  scene.add(p); particles.push(p);
+}
+
+// Camera drag
+let isDrag3=false,lmx=0,lmy=0,rotY3=0,camD3=32;
+canvas3.addEventListener("mousedown",e=>{isDrag3=true;lmx=e.clientX;lmy=e.clientY;canvas3.style.cursor="grabbing"});
+window.addEventListener("mouseup",()=>{isDrag3=false;canvas3.style.cursor="grab"});
+window.addEventListener("mousemove",e=>{
+  if(!isDrag3)return;
+  rotY3+=(e.clientX-lmx)*0.007;
+  camD3=Math.max(10,Math.min(50,camD3-(e.clientY-lmy)*0.08));
+  lmx=e.clientX;lmy=e.clientY;
+});
+canvas3.addEventListener("wheel",e=>{
+  e.preventDefault();
+  camD3=Math.max(10,Math.min(50,camD3+e.deltaY*0.025));
+},{passive:false});
+
+let t3=0;
+function animate3(){
+  requestAnimationFrame(animate3);
+  t3+=0.012;
+  if(!isDrag3) rotY3+=0.003;
+  const el=Math.PI/10;
+  camera.position.x=camD3*Math.cos(el)*Math.sin(rotY3);
+  camera.position.y=camD3*Math.sin(el)+2;
+  camera.position.z=camD3*Math.cos(el)*Math.cos(rotY3);
+  camera.lookAt(0,0,0);
+  particles.forEach(p=>{
+    p.position.y+=p.userData.vy;
+    if(p.position.y>7)p.position.y=0;
+    p.material.emissiveIntensity=0.3+Math.sin(t3+p.position.x)*0.4;
+  });
+  renderer.render(scene,camera);
+}
+animate3();
+</script>
+</body>
+</html>
