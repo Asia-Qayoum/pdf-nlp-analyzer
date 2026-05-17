@@ -30,7 +30,7 @@ analyzer.show_summary()
 
 ## 🖼️ Dashboard Preview
 
-![NLP Pipeline Dashboard](dashboard_preview(1).png)
+
 
 **What you're seeing:** Stats bar (12 pages · 2,540 raw words · 682 unique · 1,631 valid tokens · 635 stop words · EN · 41.81% vocab richness) · 3D Graveyard & Throne Room · Preprocessing Funnel · Top Bigrams · TF-IDF Scatter (required graph)
 
